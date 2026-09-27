@@ -21,8 +21,8 @@ from telebot import types
 # ==========================================
 # CONFIG - CREDENTIALS HARDCODED
 # ==========================================
-BOT_TOKEN = "8755895664:AAGBeBALGF0tKYt8diPtbyqJjCnhO_C6OWs"
-HADI_SMS_API_KEY = "cujVQ0QVbUZRohnRrZWlki0v0YNYXZWIUDJVaIvalV0FGCpBCROWGVQ=="
+BOT_TOKEN = "8755895664:AAGBeBALGF0tkYt8diPtbyqJjcNhO_C60ws"
+HADI_SMS_API_KEY = "QlJVQ0VBUzRohnRrZWlki0V0YYNXZWlUdIJValaIV0FGcpBCRoWGVQ=="
 HADI_SMS_BASE_URL = "http://smshadi.net"
 
 HADI_SMS_API_PREFIX = "/api/v1"
@@ -41,7 +41,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 print("=" * 60)
-print("✅ Loading bot with credentials...")
+print("✅ Loading bot with updated credentials...")
 print(f"✅ Bot Token loaded: {BOT_TOKEN[:20]}...")
 print(f"✅ Hadi SMS Base URL: {HADI_SMS_BASE_URL}")
 print("=" * 60)
@@ -53,7 +53,7 @@ try:
 except Exception as e:
     print(f"❌ Failed to initialize bot: {e}")
     print("=" * 60)
-    exit(1)
+    raise
 
 # ==========================================
 # SERVICE / COUNTRY OPTIONS
@@ -662,9 +662,14 @@ def handle_text(message):
     )
 
 # ==========================================
-# START BOT - POLLING LOOP
+# START BOT - POLLING LOOP (KEEPS RUNNING)
 # ==========================================
 def main():
+    print("=" * 60)
+    print("✅ BOT CONFIGURATION:")
+    print(f"   Bot Token: {BOT_TOKEN[:20]}...")
+    print(f"   Hadi SMS Base URL: {HADI_SMS_BASE_URL}")
+    print(f"   API Prefix: {HADI_SMS_API_PREFIX}")
     print("=" * 60)
     print("📡 Starting polling loop...")
     print("📡 Waiting for messages...")
