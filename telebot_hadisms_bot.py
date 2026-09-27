@@ -1,17 +1,16 @@
 """
 Telegram OTP Activation Bot using telebot with Full Hadi SMS API Integration
 
-This bot uses the telebot (pyTelegramBotAPI) library instead of python-telegram-bot.
-It provides the same features:
+This bot uses the telebot (pyTelegramBotAPI) library.
+It provides:
 - Inline keyboard buttons for service/country selection
 - Get Number and Request New Number functionality
 - Real-time OTP polling and delivery
 - Full Hadi SMS API integration
 
-Install: pip install pyTelegramBotAPI httpx
+Install: pip install pyTelegramBotAPI httpx python-dotenv
 """
 
-import asyncio
 import logging
 import os
 import re
@@ -22,6 +21,13 @@ from threading import Thread
 import httpx
 import telebot
 from telebot import types
+
+# Load environment variables (for Pydroid 3 compatibility)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # ==========================================
 # CONFIG
@@ -112,12 +118,12 @@ USER_STATE = {}
 # HADI SMS CLIENT
 # ==========================================
 class HadiSmsClient:
-    """Asynchronous Hadi SMS API client for telebot"""
+    """Synchronous Hadi SMS API client for telebot"""
 
     def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
-        self.timeout = httpx.Timeout(30.0)
+        self.timeout = 30.0
 
     def _auth_header(self) -> Dict[str, str]:
         """Build authorization header"""
@@ -142,7 +148,7 @@ class HadiSmsClient:
             response = httpx.get(
                 self._url("/services"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -156,7 +162,7 @@ class HadiSmsClient:
             response = httpx.get(
                 self._url("/countries"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -170,7 +176,7 @@ class HadiSmsClient:
             response = httpx.get(
                 self._url("/balance"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -199,7 +205,7 @@ class HadiSmsClient:
                 self._url("/order"),
                 headers=self._auth_header(),
                 json=payload,
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -213,7 +219,7 @@ class HadiSmsClient:
             response = httpx.get(
                 self._url(f"/order/{order_id}/status"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -231,7 +237,7 @@ class HadiSmsClient:
             response = httpx.get(
                 self._url(f"/order/{order_id}/sms"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
@@ -245,7 +251,7 @@ class HadiSmsClient:
             response = httpx.post(
                 self._url(f"/order/{order_id}/cancel"),
                 headers=self._auth_header(),
-                timeout=self.timeout.timeout,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             return response.json()
