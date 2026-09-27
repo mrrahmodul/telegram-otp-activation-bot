@@ -665,7 +665,7 @@ def handle_text(message):
 # START BOT - POLLING LOOP (KEEPS RUNNING)
 # ==========================================
 def main():
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("✅ BOT CONFIGURATION:")
     print(f"   Bot Token: {BOT_TOKEN[:20]}...")
     print(f"   Hadi SMS Base URL: {HADI_SMS_BASE_URL}")
@@ -705,9 +705,22 @@ def main():
             time.sleep(5)
             print("🟢 Attempting to reconnect...")
 
+# ==========================================
+# MAIN ENTRY POINT - STARTS IMMEDIATELY
+# ==========================================
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
         print(f"\n❌ Fatal error: {e}")
         logger.exception(f"Fatal error in main: {e}")
+
+# Call main() immediately to ensure it runs even on mobile environments
+print("\n📡 Initiating bot startup...")
+try:
+    main()
+except KeyboardInterrupt:
+    print("\n✋ Bot stopped.")
+except Exception as e:
+    print(f"\n❌ Startup failed: {e}")
+    logger.exception(f"Startup exception: {e}")
