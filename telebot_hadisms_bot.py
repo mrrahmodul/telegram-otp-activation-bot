@@ -1,48 +1,37 @@
 """
-Telegram OTP Activation Bot using telebot with Full Hadi SMS API Integration
+Telegram OTP Activation Bot using telebot with Hadi SMS API integration
+Works with Pydroid 3 and standard Python environments.
 
-This bot uses the telebot (pyTelegramBotAPI) library.
-It provides:
-- Inline keyboard buttons for service/country selection
-- Get Number and Request New Number functionality
-- Real-time OTP polling and delivery
-- Full Hadi SMS API integration
+This version has credentials hardcoded for direct use.
 
-Install: pip install pyTelegramBotAPI httpx python-dotenv
+Install:
+    pip install pyTelegramBotAPI httpx
 """
 
 import logging
-import os
 import re
 import time
-from typing import Any, Dict, Optional
 from threading import Thread
+from typing import Any, Dict, Optional
 
 import httpx
 import telebot
 from telebot import types
 
-# Load environment variables (for Pydroid 3 compatibility)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
 # ==========================================
-# CONFIG
+# CONFIG - CREDENTIALS HARDCODED
 # ==========================================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-HADI_SMS_API_KEY = os.getenv("HADI_SMS_API_KEY", "YOUR_HADI_SMS_API_KEY")
-HADI_SMS_BASE_URL = os.getenv("HADI_SMS_BASE_URL", "https://api.hadisms.com")
+BOT_TOKEN = "8755895664:AAGBeBALGF0tKYt8diPtbyqJjCnhO_C6OWs"
+HADI_SMS_API_KEY = "cujVQ0QVbUZRohnRrZWlki0v0YNYXZWIUDJVaIvalV0FGCpBCROWGVQ=="
+HADI_SMS_BASE_URL = "http://smshadi.net"
 
-# If your actual Hadi SMS account uses a different base path, change this:
+# Most Hadi SMS APIs use /api/v1. If your account uses a different prefix,
+# change this value.
 HADI_SMS_API_PREFIX = "/api/v1"
 
-# Use token prefix (some providers use "Token" instead of "Bearer")
+# Some providers use "Token ..." instead of "Bearer ...".
 USE_TOKEN_PREFIX = False
 
-# Poll settings
 OTP_TIMEOUT_SECONDS = 180
 POLL_INTERVAL_SECONDS = 5
 
@@ -55,8 +44,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize bot
+print("✅ Loading bot with credentials...")
+print(f"Bot Token: {BOT_TOKEN[:20]}...")
+print(f"Hadi SMS API Base URL: {HADI_SMS_BASE_URL}")
+
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+print("✅ Bot initialized successfully!")
 
 # ==========================================
 # SERVICE / COUNTRY OPTIONS
@@ -112,26 +105,19 @@ COUNTRY_OPTIONS = {
     "IT": "Italy",
 }
 
-USER_STATE = {}
+USER_STATE: Dict[int, Dict[str, Any]] = {}
 
 # ==========================================
 # HADI SMS CLIENT
 # ==========================================
 class HadiSmsClient:
-    """Synchronous Hadi SMS API client for telebot"""
-
     def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = 30.0
 
     def _auth_header(self) -> Dict[str, str]:
-        """Build authorization header"""
-        if USE_TOKEN_PREFIX:
-            auth = f"Token {self.api_key}"
-        else:
-            auth = f"Bearer {self.api_key}"
-
+        auth = f"Token {self.api_key}" if USE_TOKEN_PREFIX else f"Bearer {self.api_key}"
         return {
             "Authorization": auth,
             "Content-Type": "application/json",
@@ -139,17 +125,11 @@ class HadiSmsClient:
         }
 
     def _url(self, path: str) -> str:
-        """Build full API URL"""
         return f"{self.base_url}{HADI_SMS_API_PREFIX}{path}"
 
     def get_services(self) -> Dict[str, Any]:
-        """Synchronous wrapper for getting services"""
         try:
-            response = httpx.get(
-                self._url("/services"),
-                headers=self._auth_header(),
-                timeout=self.timeout,
-            )
+            response = httpx.get(self._url("/services"), headers=self._auth_header(), timeout=self.timeout)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -157,13 +137,8 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def get_countries(self) -> Dict[str, Any]:
-        """Synchronous wrapper for getting countries"""
         try:
-            response = httpx.get(
-                self._url("/countries"),
-                headers=self._auth_header(),
-                timeout=self.timeout,
-            )
+            response = httpx.get(self._url("/countries"), headers=self._auth_header(), timeout=self.timeout)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -171,13 +146,8 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def get_balance(self) -> Dict[str, Any]:
-        """Get account balance"""
         try:
-            response = httpx.get(
-                self._url("/balance"),
-                headers=self._auth_header(),
-                timeout=self.timeout,
-            )
+            response = httpx.get(self._url("/balance"), headers=self._auth_header(), timeout=self.timeout)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -185,21 +155,7 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def request_number(self, service: str, country: str) -> Dict[str, Any]:
-        """
-        Request a phone number from Hadi SMS
-
-        Endpoint: POST /api/v1/order
-        Body:
-        {
-            "service": "facebook",
-            "country": "US"
-        }
-        """
-        payload = {
-            "service": service.lower(),
-            "country": country.upper(),
-        }
-
+        payload = {"service": service.lower(), "country": country.upper()}
         try:
             response = httpx.post(
                 self._url("/order"),
@@ -214,7 +170,6 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def get_order_status(self, order_id: str) -> Dict[str, Any]:
-        """Get status of a specific order"""
         try:
             response = httpx.get(
                 self._url(f"/order/{order_id}/status"),
@@ -228,11 +183,6 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def get_sms(self, order_id: str) -> Dict[str, Any]:
-        """
-        Get SMS messages for an order
-
-        Endpoint: GET /api/v1/order/{order_id}/sms
-        """
         try:
             response = httpx.get(
                 self._url(f"/order/{order_id}/sms"),
@@ -246,7 +196,6 @@ class HadiSmsClient:
             return {"status": "error", "error": str(e)}
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
-        """Cancel an existing order"""
         try:
             response = httpx.post(
                 self._url(f"/order/{order_id}/cancel"),
@@ -259,14 +208,12 @@ class HadiSmsClient:
             logger.exception(f"Failed to cancel order {order_id}")
             return {"status": "error", "error": str(e)}
 
-
 hadisms = HadiSmsClient(HADI_SMS_API_KEY, HADI_SMS_BASE_URL)
 
 # ==========================================
 # HELPER FUNCTIONS
 # ==========================================
 def get_user_state(user_id: int) -> Dict[str, Any]:
-    """Get or create user state"""
     if user_id not in USER_STATE:
         USER_STATE[user_id] = {
             "service": "facebook",
@@ -277,129 +224,75 @@ def get_user_state(user_id: int) -> Dict[str, Any]:
         }
     return USER_STATE[user_id]
 
-
 def format_service_name(service_key: str) -> str:
-    """Format service key to display name"""
-    return SERVICE_OPTIONS.get(service_key, service_key.title())
-
+    return SERVICE_OPTIONS.get(service_key.lower(), service_key.title())
 
 def format_country_name(country_key: str) -> str:
-    """Format country code to display name"""
     return COUNTRY_OPTIONS.get(country_key.upper(), country_key.upper())
 
-
 def extract_otp_from_text(text: str) -> Optional[str]:
-    """Extract OTP code from SMS text"""
     if not text:
         return None
 
-    # 4 to 6 digit OTP
     match = re.search(r"\b(\d{4,6})\b", text)
     if match:
         return match.group(1)
 
-    # Example: "code: 123456"
-    match = re.search(r"code[\s:]+(\d{4,6})", text, re.IGNORECASE)
+    match = re.search(r"code[\s:]+(\\d{4,6})", text, re.IGNORECASE)
     if match:
         return match.group(1)
 
     return None
 
-
+# ==========================================
+# KEYBOARDS
+# ==========================================
 def build_main_keyboard(user_state: Dict[str, Any]) -> types.InlineKeyboardMarkup:
-    """Build main menu keyboard"""
+    markup = types.InlineKeyboardMarkup()
     service = format_service_name(user_state.get("service", "facebook"))
     country = format_country_name(user_state.get("country", "US"))
 
-    markup = types.InlineKeyboardMarkup()
     markup.row(
         types.InlineKeyboardButton("💳 Get Number", callback_data="get_number"),
         types.InlineKeyboardButton("🔄 Request New", callback_data="new_number"),
     )
     markup.row(
-        types.InlineKeyboardButton(
-            f"📱 Service: {service}", callback_data="change_service"
-        ),
-        types.InlineKeyboardButton(
-            f"🌍 Country: {country}", callback_data="change_country"
-        ),
+        types.InlineKeyboardButton(f"📱 Service: {service}", callback_data="change_service"),
+        types.InlineKeyboardButton(f"🌍 Country: {country}", callback_data="change_country"),
     )
-    markup.add(
-        types.InlineKeyboardButton("💰 Check Balance", callback_data="check_balance")
-    )
+    markup.add(types.InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"))
     return markup
 
-
 def build_service_keyboard() -> types.InlineKeyboardMarkup:
-    """Build service selection keyboard"""
     markup = types.InlineKeyboardMarkup()
-
     services = sorted(SERVICE_OPTIONS.items())
     for i in range(0, len(services), 2):
         row = []
-        row.append(
-            types.InlineKeyboardButton(
-                services[i][1], callback_data=f"set_service:{services[i][0]}"
-            )
-        )
+        row.append(types.InlineKeyboardButton(services[i][1], callback_data=f"set_service:{services[i][0]}"))
         if i + 1 < len(services):
-            row.append(
-                types.InlineKeyboardButton(
-                    services[i + 1][1], callback_data=f"set_service:{services[i + 1][0]}"
-                )
-            )
+            row.append(types.InlineKeyboardButton(services[i + 1][1], callback_data=f"set_service:{services[i + 1][0]}"))
         markup.row(*row)
-
     markup.add(types.InlineKeyboardButton("← Back", callback_data="main_menu"))
     return markup
 
-
 def build_country_keyboard() -> types.InlineKeyboardMarkup:
-    """Build country selection keyboard"""
     markup = types.InlineKeyboardMarkup()
-
     countries = sorted(COUNTRY_OPTIONS.items())
     for i in range(0, len(countries), 2):
         row = []
-        row.append(
-            types.InlineKeyboardButton(
-                f"{countries[i][1]} ({countries[i][0]})",
-                callback_data=f"set_country:{countries[i][0]}",
-            )
-        )
+        row.append(types.InlineKeyboardButton(f"{countries[i][1]} ({countries[i][0]})", callback_data=f"set_country:{countries[i][0]}"))
         if i + 1 < len(countries):
-            row.append(
-                types.InlineKeyboardButton(
-                    f"{countries[i + 1][1]} ({countries[i + 1][0]})",
-                    callback_data=f"set_country:{countries[i + 1][0]}",
-                )
-            )
+            row.append(types.InlineKeyboardButton(f"{countries[i + 1][1]} ({countries[i + 1][0]})", callback_data=f"set_country:{countries[i + 1][0]}"))
         markup.row(*row)
-
     markup.add(types.InlineKeyboardButton("← Back", callback_data="main_menu"))
     return markup
 
-
-def build_back_keyboard() -> types.InlineKeyboardMarkup:
-    """Build back button keyboard"""
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("← Back", callback_data="main_menu"))
-    return markup
-
-
 # ==========================================
-# OTP POLLING (THREADED)
+# OTP POLLING
 # ==========================================
-def poll_hadi_sms_for_otp(
-    order_id: str, chat_id: int, user_state: Dict[str, Any]
-) -> None:
-    """
-    Poll Hadi SMS for OTP in a background thread
-    """
-    logger.info(f"Starting OTP polling for order_id={order_id}")
+def poll_hadi_sms_for_otp(order_id: str, chat_id: int, user_state: Dict[str, Any]) -> None:
     started_at = time.time()
-    last_notification_time = started_at
-    notification_interval = 30
+    logger.info(f"Starting OTP polling for order_id={order_id}")
 
     while time.time() - started_at < OTP_TIMEOUT_SECONDS:
         try:
@@ -410,13 +303,7 @@ def poll_hadi_sms_for_otp(
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
 
-            # Try different response structures
-            sms_messages = (
-                response.get("sms")
-                or response.get("messages")
-                or response.get("data")
-                or []
-            )
+            sms_messages = response.get("sms") or response.get("messages") or response.get("data") or []
 
             if isinstance(sms_messages, dict):
                 sms_messages = [sms_messages]
@@ -426,14 +313,8 @@ def poll_hadi_sms_for_otp(
                     if not isinstance(item, dict):
                         continue
 
-                    text = (
-                        item.get("text")
-                        or item.get("message")
-                        or item.get("sms")
-                        or ""
-                    )
+                    text = item.get("text") or item.get("message") or item.get("sms") or ""
                     otp = extract_otp_from_text(str(text))
-
                     if otp:
                         message_text = (
                             f"✅ <b>OTP Received!</b>\n\n"
@@ -444,22 +325,12 @@ def poll_hadi_sms_for_otp(
                         logger.info(f"OTP sent to user {chat_id}")
                         return
 
-            # Periodic status update
-            elapsed = time.time() - started_at
-            if elapsed - (last_notification_time - started_at) >= notification_interval:
-                remaining = int(OTP_TIMEOUT_SECONDS - elapsed)
-                bot.send_message(
-                    chat_id, f"⏳ Waiting for OTP... {remaining}s remaining"
-                )
-                last_notification_time = time.time()
-
             time.sleep(POLL_INTERVAL_SECONDS)
 
         except Exception as e:
             logger.exception(f"Error during Hadi SMS polling: {e}")
             time.sleep(POLL_INTERVAL_SECONDS)
 
-    # Timeout
     logger.warning(f"OTP polling timed out after {OTP_TIMEOUT_SECONDS}s")
     bot.send_message(
         chat_id,
@@ -468,13 +339,11 @@ def poll_hadi_sms_for_otp(
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 # ==========================================
-# TELEGRAM COMMAND HANDLERS
+# TELEGRAM HANDLERS
 # ==========================================
 @bot.message_handler(commands=["start"])
 def handle_start(message):
-    """Handle /start command"""
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
 
@@ -483,14 +352,16 @@ def handle_start(message):
         "Powered by Hadi SMS API\n\n"
         "Choose an action below:"
     )
-    bot.send_message(
-        message.chat.id, text, parse_mode="HTML", reply_markup=build_main_keyboard(user_state)
-    )
 
+    bot.send_message(
+        message.chat.id,
+        text,
+        parse_mode="HTML",
+        reply_markup=build_main_keyboard(user_state),
+    )
 
 @bot.message_handler(commands=["help"])
 def handle_help(message):
-    """Handle /help command"""
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
 
@@ -504,23 +375,26 @@ def handle_help(message):
         "<b>Features:</b>\n"
         "✅ Get fresh phone numbers\n"
         "✅ Auto-detect verification codes\n"
-        "✅ Multi-service support (14+ services)\n"
-        "✅ Multi-country support (30+ countries)\n"
+        "✅ Multi-service support\n"
+        "✅ Multi-country support\n"
         "✅ Real-time OTP delivery\n"
         "✅ Balance tracking\n"
         "✅ Order management"
     )
-    bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=build_main_keyboard(user_state))
 
+    bot.send_message(
+        message.chat.id,
+        text,
+        parse_mode="HTML",
+        reply_markup=build_main_keyboard(user_state),
+    )
 
 @bot.message_handler(commands=["balance"])
 def handle_balance(message):
-    """Handle /balance command"""
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
 
     bot.send_message(message.chat.id, "🔄 Checking balance...")
-
     result = hadisms.get_balance()
 
     if result.get("status") == "error":
@@ -539,11 +413,6 @@ def handle_balance(message):
         f"Balance: <code>{balance}</code> {currency}"
     )
 
-    if "statistics" in result:
-        stats = result["statistics"]
-        text += f"\nOrders today: {stats.get('orders_today', 'N/A')}\n"
-        text += f"Total spent: {stats.get('total_spent', 'N/A')}"
-
     bot.send_message(
         message.chat.id,
         text,
@@ -551,10 +420,8 @@ def handle_balance(message):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 @bot.message_handler(commands=["status"])
 def handle_status(message):
-    """Handle /status command"""
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
     order_id = user_state.get("last_order_id")
@@ -568,7 +435,6 @@ def handle_status(message):
         return
 
     bot.send_message(message.chat.id, "🔍 Checking order status...")
-
     order_status = hadisms.get_order_status(order_id)
 
     if order_status.get("status") == "error":
@@ -600,16 +466,13 @@ def handle_status(message):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 # ==========================================
-# CALLBACK HANDLERS
+# CALLBACKS
 # ==========================================
 @bot.callback_query_handler(func=lambda call: call.data == "main_menu")
 def callback_main_menu(call):
-    """Handle main menu button"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
-
     bot.edit_message_text(
         "📋 <b>Main Menu</b>",
         call.message.chat.id,
@@ -618,10 +481,8 @@ def callback_main_menu(call):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "get_number")
 def callback_get_number(call):
-    """Handle Get Number button"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
     service = user_state.get("service", "facebook")
@@ -637,7 +498,6 @@ def callback_get_number(call):
         parse_mode="HTML",
     )
 
-    # Request number from Hadi SMS
     result = hadisms.request_number(service, country)
 
     if result.get("status") == "error":
@@ -650,20 +510,19 @@ def callback_get_number(call):
         )
         return
 
-    # Parse response (try multiple response structures)
     order_id = (
         result.get("id")
         or result.get("order_id")
         or result.get("orderId")
-        or result.get("data", {}).get("id")
+        or (result.get("data") or {}).get("id")
     )
     phone = (
         result.get("phone")
         or result.get("number")
-        or result.get("data", {}).get("phone")
-        or result.get("data", {}).get("number")
+        or (result.get("data") or {}).get("phone")
+        or (result.get("data") or {}).get("number")
     )
-    price = result.get("price") or result.get("data", {}).get("price") or "N/A"
+    price = result.get("price") or (result.get("data") or {}).get("price") or "N/A"
 
     if not order_id or not phone:
         bot.send_message(
@@ -676,11 +535,9 @@ def callback_get_number(call):
         )
         return
 
-    # Store order info
     user_state["last_order_id"] = str(order_id)
     user_state["current_number"] = phone
 
-    # Notify user
     message_text = (
         f"✅ <b>Number Received!</b>\n\n"
         f"📱 Phone: <code>{phone}</code>\n"
@@ -698,7 +555,6 @@ def callback_get_number(call):
         reply_markup=build_main_keyboard(user_state),
     )
 
-    # Start OTP polling in background thread
     logger.info(f"Starting background OTP polling for order {order_id}")
     poll_thread = Thread(
         target=poll_hadi_sms_for_otp,
@@ -707,14 +563,11 @@ def callback_get_number(call):
     )
     poll_thread.start()
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "new_number")
 def callback_new_number(call):
-    """Handle Request New Number button"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
 
-    # Try to cancel previous order
     old_order_id = user_state.get("last_order_id")
     if old_order_id:
         try:
@@ -723,13 +576,10 @@ def callback_new_number(call):
         except Exception as e:
             logger.warning(f"Could not cancel order {old_order_id}: {e}")
 
-    # Request new number
     callback_get_number(call)
-
 
 @bot.callback_query_handler(func=lambda call: call.data == "change_service")
 def callback_change_service(call):
-    """Handle Change Service button"""
     bot.edit_message_text(
         "📱 <b>Select a Service</b>",
         call.message.chat.id,
@@ -738,10 +588,8 @@ def callback_change_service(call):
         reply_markup=build_service_keyboard(),
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("set_service:"))
 def callback_set_service(call):
-    """Handle service selection"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
 
@@ -756,10 +604,8 @@ def callback_set_service(call):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "change_country")
 def callback_change_country(call):
-    """Handle Change Country button"""
     bot.edit_message_text(
         "🌍 <b>Select a Country</b>",
         call.message.chat.id,
@@ -768,10 +614,8 @@ def callback_change_country(call):
         reply_markup=build_country_keyboard(),
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("set_country:"))
 def callback_set_country(call):
-    """Handle country selection"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
 
@@ -786,10 +630,8 @@ def callback_set_country(call):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "check_balance")
 def callback_check_balance(call):
-    """Handle Check Balance button"""
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
 
@@ -801,7 +643,6 @@ def callback_check_balance(call):
     )
 
     result = hadisms.get_balance()
-
     if result.get("status") == "error":
         bot.send_message(
             call.message.chat.id,
@@ -823,39 +664,35 @@ def callback_check_balance(call):
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 # ==========================================
-# ERROR HANDLER
+# FALLBACK TEXT HANDLER
 # ==========================================
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
-    """Handle any other text message"""
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
-
     bot.send_message(
         message.chat.id,
         "I didn't understand that. Please use the buttons below:",
         reply_markup=build_main_keyboard(user_state),
     )
 
-
 # ==========================================
 # START BOT
 # ==========================================
 def main():
-    """Start the bot in polling mode"""
     logger.info("Starting Telegram bot with telebot library...")
     print("✅ Telegram bot started in polling mode")
     print("📡 Listening for messages...")
     print("Press Ctrl+C to stop")
 
     try:
-        bot.infinity_polling()
+        bot.infinity_polling(none_stop=True, interval=0.5, timeout=20)
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
         print("\n✋ Bot stopped")
-
+    except Exception as e:
+        logger.exception(f"Bot crashed: {e}")
+        print(f"\n❌ Bot crashed: {e}")
 
 if __name__ == "__main__":
     main()
