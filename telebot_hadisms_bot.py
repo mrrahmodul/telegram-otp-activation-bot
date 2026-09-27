@@ -25,11 +25,7 @@ BOT_TOKEN = "8755895664:AAGBeBALGF0tKYt8diPtbyqJjCnhO_C6OWs"
 HADI_SMS_API_KEY = "cujVQ0QVbUZRohnRrZWlki0v0YNYXZWIUDJVaIvalV0FGCpBCROWGVQ=="
 HADI_SMS_BASE_URL = "http://smshadi.net"
 
-# Most Hadi SMS APIs use /api/v1. If your account uses a different prefix,
-# change this value.
 HADI_SMS_API_PREFIX = "/api/v1"
-
-# Some providers use "Token ..." instead of "Bearer ...".
 USE_TOKEN_PREFIX = False
 
 OTP_TIMEOUT_SECONDS = 180
@@ -44,12 +40,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("=" * 60)
 print("✅ Loading bot with credentials...")
-print(f"Bot Token: {BOT_TOKEN[:20]}...")
-print(f"Hadi SMS API Base URL: {HADI_SMS_BASE_URL}")
+print(f"✅ Bot Token loaded: {BOT_TOKEN[:20]}...")
+print(f"✅ Hadi SMS Base URL: {HADI_SMS_BASE_URL}")
+print("=" * 60)
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
-print("✅ Bot initialized successfully!")
+try:
+    bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+    print("✅ Bot initialized successfully!")
+    print("=" * 60)
+except Exception as e:
+    print(f"❌ Failed to initialize bot: {e}")
+    print("=" * 60)
+    exit(1)
 
 # ==========================================
 # SERVICE / COUNTRY OPTIONS
@@ -233,15 +237,12 @@ def format_country_name(country_key: str) -> str:
 def extract_otp_from_text(text: str) -> Optional[str]:
     if not text:
         return None
-
     match = re.search(r"\b(\d{4,6})\b", text)
     if match:
         return match.group(1)
-
-    match = re.search(r"code[\s:]+(\\d{4,6})", text, re.IGNORECASE)
+    match = re.search(r"code[\s:]+(\d{4,6})", text, re.IGNORECASE)
     if match:
         return match.group(1)
-
     return None
 
 # ==========================================
@@ -316,12 +317,7 @@ def poll_hadi_sms_for_otp(order_id: str, chat_id: int, user_state: Dict[str, Any
                     text = item.get("text") or item.get("message") or item.get("sms") or ""
                     otp = extract_otp_from_text(str(text))
                     if otp:
-                        message_text = (
-                            f"✅ <b>OTP Received!</b>\n\n"
-                            f"Code: <code>{otp}</code>\n\n"
-                            f"Message: {text}"
-                        )
-                        bot.send_message(chat_id, message_text, parse_mode="HTML")
+                        bot.send_message(chat_id, f"✅ <b>OTP Received!</b>\n\nCode: <code>{otp}</code>\n\nMessage: {text}", parse_mode="HTML")
                         logger.info(f"OTP sent to user {chat_id}")
                         return
 
@@ -346,13 +342,11 @@ def poll_hadi_sms_for_otp(order_id: str, chat_id: int, user_state: Dict[str, Any
 def handle_start(message):
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
-
     text = (
         "👋 <b>Welcome to OTP Activation Bot</b>\n\n"
         "Powered by Hadi SMS API\n\n"
         "Choose an action below:"
     )
-
     bot.send_message(
         message.chat.id,
         text,
@@ -364,7 +358,6 @@ def handle_start(message):
 def handle_help(message):
     user_id = message.from_user.id
     user_state = get_user_state(user_id)
-
     text = (
         "ℹ️ <b>Available Commands</b>\n\n"
         "<b>Commands:</b>\n"
@@ -381,7 +374,6 @@ def handle_help(message):
         "✅ Balance tracking\n"
         "✅ Order management"
     )
-
     bot.send_message(
         message.chat.id,
         text,
@@ -538,19 +530,17 @@ def callback_get_number(call):
     user_state["last_order_id"] = str(order_id)
     user_state["current_number"] = phone
 
-    message_text = (
-        f"✅ <b>Number Received!</b>\n\n"
-        f"📱 Phone: <code>{phone}</code>\n"
-        f"📋 Service: {format_service_name(service)}\n"
-        f"🌍 Country: {format_country_name(country)}\n"
-        f"💵 Price: {price}\n"
-        f"🆔 Order ID: <code>{order_id}</code>\n\n"
-        f"<i>Waiting for SMS verification code...</i>"
-    )
-
     bot.send_message(
         call.message.chat.id,
-        message_text,
+        (
+            f"✅ <b>Number Received!</b>\n\n"
+            f"📱 Phone: <code>{phone}</code>\n"
+            f"📋 Service: {format_service_name(service)}\n"
+            f"🌍 Country: {format_country_name(country)}\n"
+            f"💵 Price: {price}\n"
+            f"🆔 Order ID: <code>{order_id}</code>\n\n"
+            f"<i>Waiting for SMS verification code...</i>"
+        ),
         parse_mode="HTML",
         reply_markup=build_main_keyboard(user_state),
     )
@@ -567,7 +557,6 @@ def callback_get_number(call):
 def callback_new_number(call):
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
-
     old_order_id = user_state.get("last_order_id")
     if old_order_id:
         try:
@@ -592,7 +581,6 @@ def callback_change_service(call):
 def callback_set_service(call):
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
-
     service = call.data.split(":", 1)[1]
     user_state["service"] = service
 
@@ -618,7 +606,6 @@ def callback_change_country(call):
 def callback_set_country(call):
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
-
     country = call.data.split(":", 1)[1]
     user_state["country"] = country
 
@@ -634,14 +621,12 @@ def callback_set_country(call):
 def callback_check_balance(call):
     user_id = call.from_user.id
     user_state = get_user_state(user_id)
-
     bot.edit_message_text(
         "💰 <b>Fetching Balance...</b>",
         call.message.chat.id,
         call.message.message_id,
         parse_mode="HTML",
     )
-
     result = hadisms.get_balance()
     if result.get("status") == "error":
         bot.send_message(
@@ -653,7 +638,6 @@ def callback_check_balance(call):
 
     balance = result.get("balance") or result.get("amount") or "Unknown"
     currency = result.get("currency") or "USD"
-
     text = f"💰 <b>Account Balance</b>\n\nBalance: <code>{balance}</code> {currency}"
 
     bot.edit_message_text(
@@ -678,21 +662,47 @@ def handle_text(message):
     )
 
 # ==========================================
-# START BOT
+# START BOT - POLLING LOOP
 # ==========================================
 def main():
-    logger.info("Starting Telegram bot with telebot library...")
-    print("✅ Telegram bot started in polling mode")
-    print("📡 Listening for messages...")
-    print("Press Ctrl+C to stop")
-
-    try:
-        bot.infinity_polling(none_stop=True, interval=0.5, timeout=20)
-    except KeyboardInterrupt:
-        print("\n✋ Bot stopped")
-    except Exception as e:
-        logger.exception(f"Bot crashed: {e}")
-        print(f"\n❌ Bot crashed: {e}")
+    print("=" * 60)
+    print("📡 Starting polling loop...")
+    print("📡 Waiting for messages...")
+    print("📡 Press Ctrl+C to stop the bot")
+    print("=" * 60)
+    
+    logger.info("Bot polling loop started")
+    
+    # Keep trying to poll even if there are temporary connection issues
+    while True:
+        try:
+            print("\n🟢 Bot is now listening for messages...")
+            logger.info("Starting infinity_polling...")
+            
+            # This is the main loop that keeps the bot running
+            bot.infinity_polling(
+                none_stop=True,
+                interval=0,
+                timeout=30
+            )
+            
+        except KeyboardInterrupt:
+            print("\n" + "=" * 60)
+            print("✋ Bot stopped by user (Ctrl+C pressed)")
+            print("=" * 60)
+            logger.info("Bot stopped by user")
+            break
+            
+        except Exception as e:
+            print(f"\n❌ Connection error: {e}")
+            print("🔄 Reconnecting in 5 seconds...")
+            logger.exception(f"Polling error: {e}")
+            time.sleep(5)
+            print("🟢 Attempting to reconnect...")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        logger.exception(f"Fatal error in main: {e}")
